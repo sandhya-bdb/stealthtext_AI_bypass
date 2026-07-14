@@ -1,0 +1,56 @@
+# ── Backend Dockerfile ───────────────────────────────────────────────────────
+#
+# Stages:
+#   1. deps   — install Python packages (cached layer)
+#   2. final  — copy source, download NLTK data, expose port
+#
+# The GPT-2 model (~500 MB) is downloaded from Hugging Face on first run and
+# cached in a Docker volume (see docker-compose.yml) so it isn't re-downloaded
+# on every container restart.
+
+FROM python:3.11-slim AS deps
+
+# System libs needed by torch / transformers
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        gcc \
+        g++ \
+        libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Install dependencies in a separate layer so they're cached
+# even when source code changes.
+COPY requirements-backend.txt .
+RUN pip install --no-cache-dir -r requirements-backend.txt
+
+# ── Final stage ──────────────────────────────────────────────────────────────
+FROM deps AS final
+
+WORKDIR /app
+
+# Copy source (excluding files listed in .dockerignore)
+COPY agent/     ./agent/
+COPY backend/   ./backend/
+COPY logic/     ./logic/
+
+# Pre-download NLTK data so the container doesn't need outbound internet at runtime.
+# wordnet is used by humanizer.py; punkt + averaged_perceptron_tagger are optional.
+RUN python -c "import nltk; nltk.download('wordnet', quiet=True); \
+               nltk.download('averaged_perceptron_tagger', quiet=True); \
+               nltk.download('punkt', quiet=True)"
+
+# Expose FastAPI port
+EXPOSE 8000
+
+# Hugging Face model cache directory — mount as a volume in docker-compose
+# so GPT-2 is downloaded once and reused across restarts.
+ENV TRANSFORMERS_CACHE=/app/.cache/huggingface
+ENV HF_HOME=/app/.cache/huggingface
+
+# Health check — uvicorn takes ~20 s to load GPT-2 on first start
+HEALTHCHECK --interval=15s --timeout=10s --start-period=60s --retries=5 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/')"
+
+CMD ["uvicorn", "backend.api:app", "--host", "0.0.0.0", "--port", "8000", \
+     "--workers", "1", "--log-level", "info"]

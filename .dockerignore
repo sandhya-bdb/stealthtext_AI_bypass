@@ -1,0 +1,48 @@
+# ── Python cache ─────────────────────────────────────────────────────────────
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+
+# ── Virtual environments ──────────────────────────────────────────────────────
+.venv/
+venv/
+env/
+ENV/
+
+# ── Tests & dev tooling ───────────────────────────────────────────────────────
+tests/
+pytest.ini
+.pytest_cache/
+.coverage
+htmlcov/
+
+# ── Secrets — NEVER bake into images ─────────────────────────────────────────
+.env
+# (docker-compose passes .env at runtime via env_file:, not at build time)
+
+# ── Model / data caches — use volumes instead ─────────────────────────────────
+.cache/
+*.cache
+
+# ── IDE & OS noise ───────────────────────────────────────────────────────────
+.vscode/
+.idea/
+.DS_Store
+*.swp
+*~
+
+# ── Git ───────────────────────────────────────────────────────────────────────
+.git/
+.gitignore
+
+# ── Docker artifacts ──────────────────────────────────────────────────────────
+Dockerfile*
+docker-compose*.yml
+*.dockerignore
+
+# ── Docs ──────────────────────────────────────────────────────────────────────
+*.md
+README*

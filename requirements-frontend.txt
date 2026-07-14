@@ -1,0 +1,6 @@
+# ── Frontend (Streamlit UI only) ─────────────────────────────────────────────
+# Deliberately thin — no torch, no transformers (those live in the backend)
+streamlit
+requests
+python-dotenv
+wcwidth

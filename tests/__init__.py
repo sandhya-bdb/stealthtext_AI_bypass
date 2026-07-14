@@ -1,0 +1,1 @@
+# StealthText test package

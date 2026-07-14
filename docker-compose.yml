@@ -1,0 +1,64 @@
+services:
+
+  # ── Backend — FastAPI + LangGraph + GPT-2 + Groq ─────────────────────────
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: stealthtext-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env                      # GROQ_API_KEY, LANGCHAIN_*, etc.
+    environment:
+      # Tell the frontend container where to reach us
+      BACKEND_URL: http://backend:8000
+      # Cache GPT-2 model in the named volume below
+      TRANSFORMERS_CACHE: /app/.cache/huggingface
+      HF_HOME: /app/.cache/huggingface
+    volumes:
+      # Persist the downloaded GPT-2 model between restarts (~500 MB)
+      - hf_cache:/app/.cache/huggingface
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:8000/')"]
+      interval: 15s
+      timeout: 10s
+      start_period: 90s       # GPT-2 loads slowly on first cold start
+      retries: 5
+
+  # ── Frontend — Streamlit UI ───────────────────────────────────────────────
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: stealthtext-frontend
+    restart: unless-stopped
+    ports:
+      - "8501:8501"
+    env_file:
+      - .env                      # LANGCHAIN_* vars for sidebar badge
+    environment:
+      # Point the Streamlit app at the backend service by its Docker DNS name
+      BACKEND_URL: http://backend:8000
+    depends_on:
+      backend:
+        condition: service_healthy  # Wait until GPT-2 is loaded before starting UI
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:8501/_stcore/health')"]
+      interval: 10s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+
+# ── Named volumes ─────────────────────────────────────────────────────────────
+volumes:
+  hf_cache:
+    driver: local
+    # To pre-populate from your host's HuggingFace cache, uncomment:
+    # driver_opts:
+    #   type: none
+    #   o: bind
+    #   device: ~/.cache/huggingface

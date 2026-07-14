@@ -1,0 +1,31 @@
+# ── Frontend Dockerfile ──────────────────────────────────────────────────────
+#
+# Extremely thin image — just Python + Streamlit.
+# All ML inference happens in the backend container.
+
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install frontend dependencies only
+COPY requirements-frontend.txt .
+RUN pip install --no-cache-dir -r requirements-frontend.txt
+
+# Copy only the frontend source
+COPY frontend/ ./frontend/
+
+# Expose Streamlit port
+EXPOSE 8501
+
+# Streamlit config: disable the "Deploy" button, allow iframe embedding,
+# and silence the email prompt on first run.
+RUN mkdir -p /root/.streamlit
+RUN printf '[server]\nheadless = true\nport = 8501\nenableCORS = false\nenableXsrfProtection = false\n\n[browser]\ngatherUsageStats = false\n' \
+    > /root/.streamlit/config.toml
+
+HEALTHCHECK --interval=10s --timeout=5s --start-period=20s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8501/_stcore/health')"
+
+CMD ["streamlit", "run", "frontend/app.py", \
+     "--server.port=8501", \
+     "--server.address=0.0.0.0"]
