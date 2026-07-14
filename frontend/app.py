@@ -185,6 +185,16 @@ with st.sidebar:
         st.caption("Set `LANGCHAIN_TRACING_V2=true` in `.env` to enable.")
 
     st.markdown("---")
+    st.markdown("**✍️ Writing Tone**")
+    tone_option = st.selectbox(
+        "Select tone",
+        options=["Casual / Creative", "Professional / Academic"],
+        index=0,
+        label_visibility="collapsed"
+    )
+    tone = "casual" if tone_option == "Casual / Creative" else "professional"
+
+    st.markdown("---")
     st.markdown("### 📖 Score Guide")
     st.markdown("""
 **Perplexity** — unpredictability of words
@@ -299,7 +309,11 @@ if humanize_btn:
     if input_text.strip():
         with st.spinner("Agent rewriting (up to 3 iterations via Groq)… ~20–40 seconds"):
             try:
-                r = requests.post(f"{API_URL}/humanize", json={"text": input_text}, timeout=180)
+                r = requests.post(
+                    f"{API_URL}/humanize",
+                    json={"text": input_text, "tone": tone},
+                    timeout=180
+                )
                 if r.status_code == 200:
                     data = r.json()
                     st.session_state['humanized_result'] = data

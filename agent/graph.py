@@ -3,6 +3,7 @@ from langgraph.graph import StateGraph, END
 import operator
 from logic.detector import AIDetector
 from logic.humanizer import TextHumanizer
+from logic.external_detector import GPTZeroClient
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -28,29 +29,42 @@ class AgentState(TypedDict):
     iterations: int
     history: List[str]
     score_history: List[dict]
+    tone: str
+    gptzero_score: float
 
 # 2. Logic Initialization
 detector = AIDetector()
 humanizer = TextHumanizer()
+gptzero = GPTZeroClient()
 
 # 3. Nodes
 @traceable(name="detector_node", run_type="chain", tags=["stealthtext", "detector"])
 def detector_node(state: AgentState):
     print(f"--- DETECTOR NODE (Iteration {state.get('iterations', 0)}) ---")
     text = state['text']
+    iterations = state.get('iterations', 0)
     
     # Calculate scores
     result = detector.analyze(text)
+    
+    # Call external GPTZero API only if key is configured, we're past iteration 0,
+    # and the local pre-screen looks promising (perplexity > 55, burstiness > 15)
+    gptzero_score = 0.0
+    if gptzero.api_key and iterations > 0:
+        if result['perplexity'] > 55 and result['burstiness'] > 15:
+            gptzero_score = gptzero.check(text)
     
     return {
         "perplexity": result['perplexity'],
         "burstiness": result['burstiness'],
         "verdict": "Likely Human" if result['ai_score'] < 50 else "Likely AI", # Simplified threshold
-        "iterations": state.get('iterations', 0),
+        "iterations": iterations,
+        "gptzero_score": gptzero_score,
         "score_history": state.get('score_history', []) + [{
-            "iteration": state.get('iterations', 0),
+            "iteration": iterations,
             "perplexity": result['perplexity'],
-            "burstiness": result['burstiness']
+            "burstiness": result['burstiness'],
+            "gptzero_score": gptzero_score
         }]
     }
 
@@ -58,9 +72,10 @@ def detector_node(state: AgentState):
 def rewriter_node(state: AgentState):
     print("--- REWRITER NODE ---")
     current_text = state['text']
+    tone = state.get('tone', 'casual')
     
     # Rewrite text
-    new_text = humanizer.rewrite(current_text)
+    new_text = humanizer.rewrite(current_text, tone=tone)
     
     return {
         "text": new_text,
@@ -70,9 +85,6 @@ def rewriter_node(state: AgentState):
 
 # 4. Edges
 def should_continue(state: AgentState):
-    # Thresholds: PPL > 60 and Burstiness > 15 usually indicates Human
-    # Or stop if max iterations reached
-    
     if state['iterations'] >= 3:
         return "end"
     
@@ -80,8 +92,16 @@ def should_continue(state: AgentState):
     if state['iterations'] == 0:
         return "rewrite"
         
-    if state['perplexity'] > 80 and state['burstiness'] > 20: # Increased thresholds
-        return "end"
+    local_passed = state['perplexity'] > 80 and state['burstiness'] > 20
+    
+    if gptzero.api_key:
+        # If external verification is enabled, we require both local pass and external pass (< 40% AI)
+        if local_passed and state.get('gptzero_score', 100.0) < 40.0:
+            return "end"
+    else:
+        # If external verification is disabled, rely purely on local scores
+        if local_passed:
+            return "end"
         
     return "rewrite"
 

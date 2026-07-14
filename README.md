@@ -10,8 +10,16 @@ StealthText is an AI text humanizer that uses a **LangGraph agent loop** to rewr
 
 Instead of simple prompt-wrapping, StealthText uses a closed-loop system:
 1. **Detect**: Scores text using a local GPT-2 model (evaluating Perplexity and Burstiness).
-2. **Rewrite**: If the text scores as "Likely AI", it calls Groq (Llama 3.3 70B) to humanize it.
-3. **Evaluate**: Loops back to the detector until the text passes as human, or hits a max iteration limit.
+2. **Rewrite**: If the text scores as "Likely AI", it calls Groq (Llama 3.3 70B) to humanize it according to the selected **Writing Tone**.
+3. **Verify (Optional)**: If configured, verifies candidate humanized drafts against the commercial **GPTZero API**.
+4. **Evaluate**: Loops back to the detector until the text passes as human, or hits a max iteration limit.
+
+## ✨ Key Features
+
+- **✍️ Tone Control Selector:** Choose between **Casual / Creative** (adds natural hedges, casual transitions, and expressive punctuation) or **Professional / Academic** (preserves formal, objective vocabulary and authoritative syntax while avoiding AI markers).
+- **📈 Score Trend Charts:** Visualizes perplexity and burstiness improvements iteration-by-iteration using a real-time line chart.
+- **📋 Copy to Clipboard:** Integrated clipboard utility on the humanized output panel with visual success notifications.
+- **🛡️ Hybrid Verification (GPTZero Client):** Supports optional validation against commercial detectors, utilizing local GPT-2 pre-screening to conserve API credits.
 
 ## 🏗 Architecture
 
@@ -19,11 +27,15 @@ The backend is built with FastAPI and LangGraph, completely decoupled from the S
 
 ```mermaid
 graph TD
-    A[Input Text] --> B(Detector Node: GPT-2)
+    A[Input Text] --> B(Detector Node: Local GPT-2)
     B --> C{Should Continue?}
     C -->|AI Score > 50 & < 3 iterations| D(Rewriter Node: Groq Llama 3)
     D --> B
-    C -->|Human Score or Max Iterations| E[Final Humanized Text]
+    C -->|Local Human Score| F{GPTZero API Key Set?}
+    F -->|Yes| G(External Check: GPTZero API)
+    F -->|No| E[Final Humanized Text]
+    G -->|Passed < 40% AI| E
+    G -->|Failed >= 40% AI| D
 ```
 
 ## 🚀 Quick Start (Docker)

@@ -60,6 +60,10 @@ class TextRequest(BaseModel):
         return stripped  # return stripped so downstream never sees leading/trailing whitespace
 
 
+class HumanizeRequest(TextRequest):
+    tone: str = "casual"
+
+
 class AnalysisResponse(BaseModel):
     perplexity: float
     burstiness: float
@@ -117,7 +121,7 @@ async def analyze_text(request: TextRequest):
     run_type="chain",
     tags=["stealthtext", "api"],
 )
-def _run_humanize_graph(text: str) -> dict:
+def _run_humanize_graph(text: str, tone: str = "casual") -> dict:
     """
     Thin wrapper so LangSmith captures the full agent pipeline
     (detect → rewrite loop) as a single named top-level trace.
@@ -127,22 +131,23 @@ def _run_humanize_graph(text: str) -> dict:
         "original_text": text,
         "iterations": 0,
         "history": [],
+        "tone": tone,
     }
     return agent_app.invoke(initial_state)
 
 
 @app.post("/humanize", response_model=HumanizeResponse)
-async def humanize_text(request: TextRequest):
+async def humanize_text(request: HumanizeRequest):
     """
     Run the LangGraph detect→rewrite agent on the supplied text.
     Returns the humanized text along with final scores and iteration count.
     """
-    logger.info("/humanize — %d chars", len(request.text))
+    logger.info("/humanize — %d chars, tone=%s", len(request.text), request.tone)
     try:
-        final_state = _run_humanize_graph(request.text)
+        final_state = _run_humanize_graph(request.text, tone=request.tone)
         logger.info(
-            "/humanize done — %d iteration(s), final ppl=%.1f",
-            final_state["iterations"], final_state["perplexity"],
+            "/humanize done — %d iteration(s), final ppl=%.1f, tone=%s",
+            final_state["iterations"], final_state["perplexity"], request.tone
         )
         return {
             "original_text":    final_state["original_text"],

@@ -45,7 +45,7 @@ AI_STOP_WORDS = {
     "transformative": ["game-changing", "big"],
 }
 
-SYSTEM_PROMPT = """You are a skilled human writer. Rewrite the given text so it sounds like a real person wrote it — not a chatbot.
+SYSTEM_PROMPT_CASUAL = """You are a skilled human writer. Rewrite the given text so it sounds like a real person wrote it in a casual, conversational style.
 
 STRICT RULES you MUST follow:
 1. COMPLETELY restructure sentences. Do NOT copy the original structure.
@@ -54,6 +54,18 @@ STRICT RULES you MUST follow:
 4. Replace formal words: "utilize"→"use", "leverage"→"rely on", "implement"→"set up", "achieve"→"get to", "enable"→"let".
 5. NEVER use: delve, crucial, moreover, furthermore, meticulous, showcase, realm, tapestry, pivotal, paramount, seamless, robust, comprehensive, innovative, groundbreaking, transformative, notably, consequently, in conclusion.
 6. Use dashes, ellipses, and rhetorical questions naturally.
+7. Keep the core meaning 100% intact.
+8. Return ONLY the rewritten text. No explanations, no preamble, no quotes."""
+
+SYSTEM_PROMPT_PROFESSIONAL = """You are a highly skilled professional writer and academic editor. Rewrite the given text so it sounds like a real expert wrote it — NOT an AI chatbot. It must be polished, professional, and suitable for official or educational contexts. Do NOT make it overly emotional, informal, or use slang.
+
+STRICT RULES you MUST follow:
+1. COMPLETELY restructure sentences to avoid predictable AI writing patterns.
+2. MIX sentence lengths: some short and punchy, some longer and complex. AI writing is overly uniform; human writing varies in rhythm.
+3. Maintain a formal, authoritative, and objective tone. Do NOT add informal hedges like "honestly", "basically", "kind of", "you know", or exclamation marks.
+4. Keep the vocabulary sophisticated but clear. Replace overused AI transition words and buzzwords.
+5. NEVER use: delve, crucial, moreover, furthermore, meticulous, showcase, realm, tapestry, pivotal, paramount, seamless, robust, comprehensive, innovative, groundbreaking, transformative, notably, consequently, in conclusion, leverage, utilize. Replace them with standard professional alternatives (e.g. use 'explore/examine' instead of 'delve', 'important/essential' instead of 'crucial', 'also/in addition' instead of 'furthermore/moreover').
+6. Do NOT use overly dramatic punctuation like ellipses (...) or multiple exclamation marks.
 7. Keep the core meaning 100% intact.
 8. Return ONLY the rewritten text. No explanations, no preamble, no quotes."""
 
@@ -111,7 +123,7 @@ class TextHumanizer:
 
     # ── Public API ───────────────────────────────────────────────────────────
 
-    def rewrite(self, text: str) -> str:
+    def rewrite(self, text: str, tone: str = "casual") -> str:
         """
         Rewrite *text* using Groq LLM to sound more human.
 
@@ -129,15 +141,16 @@ class TextHumanizer:
             logger.warning("Groq client not available — returning original text.")
             return text
 
-        logger.info("Sending %d chars to Groq for rewriting…", len(text))
+        system_prompt = SYSTEM_PROMPT_PROFESSIONAL if tone == "professional" else SYSTEM_PROMPT_CASUAL
+        logger.info("Sending %d chars to Groq for rewriting (tone=%s)…", len(text), tone)
         try:
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[
-                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "system", "content": system_prompt},
                     {"role": "user",   "content": f"Rewrite this text:\n\n{text}"},
                 ],
-                temperature=0.9,
+                temperature=0.85 if tone == "professional" else 0.9,
                 max_tokens=2048,
             )
             result = response.choices[0].message.content.strip()
@@ -150,6 +163,6 @@ class TextHumanizer:
             logger.exception("Groq API call failed: %s", exc)
             return text
 
-    def advanced_rewrite(self, text: str, api_key: str = None) -> str:
+    def advanced_rewrite(self, text: str, tone: str = "casual", api_key: str = None) -> str:
         """Alias for rewrite() — kept for backwards compatibility."""
-        return self.rewrite(text)
+        return self.rewrite(text, tone=tone)
