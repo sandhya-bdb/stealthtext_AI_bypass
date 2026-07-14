@@ -1,6 +1,6 @@
 # StealthText 🕵️‍♂️
 
-![Tests](https://github.com/USERNAME/StealthText/actions/workflows/ci.yml/badge.svg)
+![Tests](https://github.com/sandhya-bdb/stealthtext_AI_bypass/actions/workflows/ci.yml/badge.svg)
 ![Python](https://img.shields.io/badge/python-3.11%2B-blue)
 ![LangGraph](https://img.shields.io/badge/LangGraph-Agent-purple)
 ![FastAPI](https://img.shields.io/badge/FastAPI-Backend-009688)
@@ -32,8 +32,8 @@ The easiest way to run StealthText is via Docker. The GPT-2 model (~500MB) will 
 
 1. **Clone the repo**
    ```bash
-   git clone https://github.com/USERNAME/StealthText.git
-   cd StealthText
+   git clone https://github.com/sandhya-bdb/stealthtext_AI_bypass.git
+   cd stealthtext_AI_bypass
    ```
 
 2. **Configure API Keys**
